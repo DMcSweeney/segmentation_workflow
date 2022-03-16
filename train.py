@@ -11,20 +11,30 @@ from torch.utils.data import DataLoader
 import torchvision.models as models
 import torch.optim as optim
 
+from configparser import ConfigParser
 
 from utils.customDataset import customDataset
 from utils.loops import segmenter
 from utils.customWriter import customWriter
 import cv2
+import os
 
-train_path = './data/training/'
-valid_path = './data/testing/'
+#~ ====  Read config === 
+config  = ConfigParser()
+config.read('config.ini')
 
-batch_size = 4
-num_epochs=500
-learning_rate = 3e-4
+root_dir = config['DIRECTORIES']['InputDirectory']
 
-weight_path = '/home/donal/data/Donal_Backup/ResNet/COCO/experiments/bootstrap_132/iteration_1/repeat_0/best_model.pt'
+train_path = os.path.join(root_dir, 'split_data/training')
+valid_path = os.path.join(root_dir, 'split_data/testing')
+
+#~ PARAMS
+batch_size = int(config['TRAINING']['BatchSize'])
+num_epochs= int(config['TRAINING']['NumEpochs'])
+learning_rate = float(config['TRAINING']['LR'])
+device = f"cuda:{int(config['TRAINING']['GPU'])}"
+
+weight_path = config['TRAINING']['InitWeights']
 
 
 def load_weights(pt_model):
@@ -65,9 +75,12 @@ def main():
     valid_transforms = A.Compose(
         [A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=1), ToTensor()])
 
-    train_dataset = customDataset(train_path, train_transforms, read_masks=True)
+    #~ init. Datasets
+    train_dataset = customDataset(train_path, train_transforms, read_masks=True, 
+                window=config['TRAINING'].getint('Window'), level=config['TRAINING'].getint('Level'))
     valid_dataset = customDataset(
-        valid_path, valid_transforms, read_masks=True)
+        valid_path, valid_transforms, read_masks=True, 
+        window=config['TRAINING'].getint('Window'), level=config['TRAINING'].getint('Level'))
     train_loader = DataLoader(train_dataset, batch_size)
     valid_loader = DataLoader(valid_dataset, batch_size)
 
@@ -75,8 +88,8 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     writer = customWriter(batch_size)
 
-
-    seg = segmenter(model, optimizer, train_loader, valid_loader, writer, num_epochs, device='cuda:3')
+    #~ ==== TRAIN =====
+    seg = segmenter(model, optimizer, train_loader, valid_loader, writer, num_epochs, device=device)
     seg.forward()
 
 
