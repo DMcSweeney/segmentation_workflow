@@ -5,4 +5,4 @@ sanity/
 runs/
 logs/
 __pycache__/
-prep_data.ipynb
+./prep_data.ipynb
