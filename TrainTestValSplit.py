@@ -36,8 +36,8 @@ def copy_files(names, out_path):
     #~ Copy files to destination
     print(f'Writing {len(names)} files to {out_path}')
     #* Make directories
-    slice_dir = os.path.join(out_path, 'slices')
-    mask_dir = os.path.join(out_path, 'masks')
+    slice_dir = os.path.join(out_path, 'slices/')
+    mask_dir = os.path.join(out_path, 'masks/')
     
     os.makedirs(slice_dir, exist_ok=True)
     os.makedirs(mask_dir, exist_ok=True)

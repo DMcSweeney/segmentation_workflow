@@ -1,10 +1,10 @@
 """
 Main Training script 
 """
-from albumentations.augmentations.transforms import ElasticTransform
+from albumentations.augmentations.geometric.transforms import ElasticTransform
 import torch
 import albumentations as A
-from albumentations.pytorch import ToTensor
+from albumentations.pytorch import ToTensorV2
 from torch.optim import optimizer
 
 from torch.utils.data import DataLoader
@@ -33,14 +33,14 @@ batch_size = int(config['TRAINING']['BatchSize'])
 num_epochs= int(config['TRAINING']['NumEpochs'])
 learning_rate = float(config['TRAINING']['LR'])
 device = f"cuda:{int(config['TRAINING']['GPU'])}"
-
+print('Using device: ', device)
 weight_path = config['TRAINING']['InitWeights']
 
 
 def load_weights(pt_model):
     model = models.segmentation.fcn_resnet101(pretrained=False, num_classes=1)
     #* Load weights
-    pt_dict = torch.load(pt_model)
+    pt_dict = torch.load(pt_model, map_location=device)
     model_dict = model.state_dict()
     pretrained_dict = {}
     for key, val in pt_dict.items():
@@ -66,21 +66,27 @@ def main():
         A.Rotate(p=0.5, limit=20, border_mode=cv2.BORDER_CONSTANT, value=0),
         A.GridDistortion(p=0.5, num_steps=3, distort_limit=0.3, border_mode=4, interpolation=1),
         A.RandomScale(),
-        A.Resize(512, 512),
+        A.Resize(270, 270),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(
             0.229, 0.224, 0.225), max_pixel_value=1),
-        ToTensor()
+        ToTensorV2(transpose_mask=True)
     ])
     #* Normalise to ImageNet mean and std 
     valid_transforms = A.Compose(
-        [A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=1), ToTensor()])
+        [A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), 
+        max_pixel_value=1), 
+        ToTensorV2(transpose_mask=True)])
 
     #~ init. Datasets
     train_dataset = customDataset(train_path, train_transforms, read_masks=True, 
-                window=config['TRAINING'].getint('Window'), level=config['TRAINING'].getint('Level'))
+            normalise=config['TRAINING'].getboolean('Normalise'),
+            window=config['TRAINING'].getint('Window'), level=config['TRAINING'].getint('Level'))
+
     valid_dataset = customDataset(
         valid_path, valid_transforms, read_masks=True, 
+        normalise = config['TRAINING'].getboolean('Normalise'),
         window=config['TRAINING'].getint('Window'), level=config['TRAINING'].getint('Level'))
+
     train_loader = DataLoader(train_dataset, batch_size)
     valid_loader = DataLoader(valid_dataset, batch_size)
 

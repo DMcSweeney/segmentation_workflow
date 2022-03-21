@@ -6,8 +6,10 @@ import torch
 import torch.nn as nn
 
 from tqdm import tqdm
+from torch.cuda.amp import autocast, GradScaler
 
 from utils.customLosses import diceLoss
+from torch.nn.utils import clip_grad_norm_
 
 class segmenter():
     def __init__(self, model, optimizer, train_loader, val_loader, writer, num_epochs, device="cuda:0"):
@@ -21,6 +23,7 @@ class segmenter():
         self.val_loader = val_loader
         self.writer = writer
         self.num_epochs = num_epochs
+        self.scaler = GradScaler()
         self.best_loss = 10000
         self.output_path = './logs/'
         self.weights = (1, 1) #* X-ent weight vs DSC weight
@@ -32,28 +35,35 @@ class segmenter():
             self.training(epoch)
             self.validation(epoch)
             self.save_best_model()
-
-
+    
     def training(self, epoch, writer_step=25):
         self.model.train()
         self.writer.reset_losses()
         for idx, data in enumerate(tqdm(self.train_loader)):
             inputs = data['inputs'].to(self.device, dtype=torch.float32)
             targets = data['targets'].to(self.device, dtype=torch.float32)
-            # Zero parameter gradient
+            
+            #* Zero parameter gradient
             self.optimizer.zero_grad()
-            outputs = self.model(inputs)
+            with autocast():
+                outputs = self.model(inputs)
 
-            bce_loss = self.bce(outputs['out'], targets)
-            dice_loss = self.dsc(outputs['out'], targets)
-            train_loss = self.weights[0]*bce_loss + self.weights[1]*dice_loss
-
+                bce_loss = self.bce(outputs['out'], targets)
+                dice_loss = self.dsc(outputs['out'], targets)
+                train_loss = self.weights[0]*bce_loss + self.weights[1]*dice_loss
+            
+            #* Compute backward pass on scaled loss
+            self.scaler.scale(train_loss).backward()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+            
             self.writer.metrics['train_loss'].append(train_loss.item())
-            train_loss.backward()
-            self.optimizer.step()
+        
             if epoch % writer_step == 0 and idx == 0:
                 print('Plotting inputs...')
                 self.writer.plot_inputs('Inputs', inputs)
+                self.writer.plot_segmentation(
+                    'Predictions', inputs, outputs['out'], targets=targets)
 
         print('Train Loss:', np.mean(self.writer.metrics['train_loss']))
         self.writer.add_scalar('Training_loss', np.mean(self.writer.metrics['train_loss']), epoch)
