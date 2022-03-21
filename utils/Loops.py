@@ -8,8 +8,8 @@ import torch.nn as nn
 from tqdm import tqdm
 from torch.cuda.amp import autocast, GradScaler
 
-from utils.customLosses import diceLoss
-from torch.nn.utils import clip_grad_norm_
+from utils.Losses import diceLoss
+from utils.EarlyStopping import EarlyStopping
 
 class segmenter():
     def __init__(self, model, optimizer, train_loader, val_loader, writer, num_epochs, device="cuda:0"):
@@ -22,19 +22,26 @@ class segmenter():
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.writer = writer
-        self.num_epochs = num_epochs
         self.scaler = GradScaler()
+        self.stopper = EarlyStopping(patience=75)
+        #~ Params
+        self.num_epochs = num_epochs
         self.best_loss = 10000
         self.output_path = './logs/'
         self.weights = (1, 1) #* X-ent weight vs DSC weight
         
     def forward(self):
+        self.stop = False
         for epoch in range(self.num_epochs+1):
             print(f'Epoch {epoch} of {self.num_epochs}')
             self.writer.epoch = epoch
             self.training(epoch)
             self.validation(epoch)
             self.save_best_model()
+            #~ Early stopping
+            if self.stop:
+                print('==== Early Stopping ====')
+                break
     
     def training(self, epoch, writer_step=25):
         self.model.train()
@@ -67,6 +74,8 @@ class segmenter():
 
         print('Train Loss:', np.mean(self.writer.metrics['train_loss']))
         self.writer.add_scalar('Training_loss', np.mean(self.writer.metrics['train_loss']), epoch)
+        self.writer.add_scalar(
+            'Learning Rate', self.optimizer.param_groups[0]['lr'], epoch)
 
     def validation(self, epoch, writer_step=5):
         self.model.eval()
@@ -103,3 +112,6 @@ class segmenter():
             print('Saving best model')
             torch.save(self.model.state_dict(),
                        self.output_path + model_name)
+        #~ Check stopping criterion
+        if self.stopper.step(torch.tensor([loss1])):
+            self.stop = True

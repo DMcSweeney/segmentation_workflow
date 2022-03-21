@@ -13,9 +13,9 @@ import torch.optim as optim
 
 from configparser import ConfigParser
 
-from utils.customDataset import customDataset
-from utils.loops import segmenter
-from utils.customWriter import customWriter
+from utils.Dataset import customDataset
+from utils.Loops import segmenter
+from utils.Writer import customWriter
 import cv2
 import os
 
