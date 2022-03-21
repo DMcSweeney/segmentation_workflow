@@ -4,6 +4,7 @@ Training loop class
 import numpy as np
 import torch
 import torch.nn as nn
+import os
 
 from tqdm import tqdm
 from torch.cuda.amp import autocast, GradScaler
@@ -12,7 +13,8 @@ from utils.Losses import diceLoss
 from utils.EarlyStopping import EarlyStopping
 
 class segmenter():
-    def __init__(self, model, optimizer, train_loader, val_loader, writer, num_epochs, device="cuda:0"):
+    def __init__(self, model, optimizer, train_loader,
+     val_loader, writer, num_epochs, device="cuda:0", output_path='./logs'):
         self.device = torch.device(device)
         self.model = model.to(device)
         self.optimizer = optimizer
@@ -27,7 +29,8 @@ class segmenter():
         #~ Params
         self.num_epochs = num_epochs
         self.best_loss = 10000
-        self.output_path = './logs/'
+        self.output_path = output_path
+        os.makedirs(output_path, exist_ok=True)
         self.weights = (1, 1) #* X-ent weight vs DSC weight
         
     def forward(self):
@@ -103,6 +106,7 @@ class segmenter():
             self.writer.metrics['val_loss']), epoch)
         self.writer.add_scalar('BCE', np.mean(self.writer.metrics['BCE']), epoch)
         self.writer.add_scalar('DSC', np.mean(self.writer.metrics['DSC']), epoch)
+        self.scheduler.step(np.mean(self.writer.metrics['val_loss']))
 
     def save_best_model(self, model_name='best_model.pt'):
         loss1 = np.mean(self.writer.metrics['val_loss'])

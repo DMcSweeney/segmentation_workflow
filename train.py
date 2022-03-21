@@ -12,6 +12,7 @@ import torchvision.models as models
 import torch.optim as optim
 
 from configparser import ConfigParser
+from argparse import ArgumentParser
 
 from utils.Dataset import customDataset
 from utils.Loops import segmenter
@@ -19,9 +20,16 @@ from utils.Writer import customWriter
 import cv2
 import os
 
+#~ Arg. Parse for config file
+parser = ArgumentParser(description='Inference for testing segmentation model')
+parser.add_argument('--config', '--c', dest='config',
+                    default='config.ini', type=str, help='Path to config.ini file')
+args = parser.parse_args()
+
+
 #~ ====  Read config === 
 config  = ConfigParser()
-config.read('config.ini')
+config.read('config_cbct.ini')
 
 root_dir = config['DIRECTORIES']['InputDirectory']
 
@@ -34,15 +42,18 @@ num_epochs= int(config['TRAINING']['NumEpochs'])
 learning_rate = float(config['TRAINING']['LR'])
 device = f"cuda:{int(config['TRAINING']['GPU'])}"
 print('Using device: ', device)
+torch.cuda.set_device(device)
 weight_path = config['TRAINING']['InitWeights']
-
+input_size = int(config['TRAINING']['InputSize'])
 
 def load_weights(pt_model):
     model = models.segmentation.fcn_resnet101(pretrained=False, num_classes=1)
     #* Load weights
     pt_dict = torch.load(pt_model, map_location=device)
     model_dict = model.state_dict()
+
     pretrained_dict = {}
+    #~ In case loading from different architecture
     for key, val in pt_dict.items():
         if key in model_dict:
             if val.shape == model_dict[key].shape:
@@ -66,7 +77,7 @@ def main():
         A.Rotate(p=0.5, limit=20, border_mode=cv2.BORDER_CONSTANT, value=0),
         A.GridDistortion(p=0.5, num_steps=3, distort_limit=0.3, border_mode=4, interpolation=1),
         A.RandomScale(),
-        A.Resize(270, 270),
+        A.Resize(input_size, input_size),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(
             0.229, 0.224, 0.225), max_pixel_value=1),
         ToTensorV2(transpose_mask=True)
@@ -95,7 +106,10 @@ def main():
     writer = customWriter(batch_size)
 
     #~ ==== TRAIN =====
-    seg = segmenter(model, optimizer, train_loader, valid_loader, writer, num_epochs, device=device)
+    seg = segmenter(model, optimizer, train_loader,
+                    valid_loader, writer, num_epochs, 
+                    device=device, output_path=config['DIRECTORIES']['OutputDirectory']
+                    )
     seg.forward()
 
 

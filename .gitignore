@@ -6,3 +6,8 @@ runs/
 logs/
 __pycache__/
 ./prep_data.ipynb
+config_cbct.ini
+config_mres.ini
+*.npz
+*.pt
+*_logs
