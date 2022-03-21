@@ -4,7 +4,7 @@ __All configs in: `config.ini`__
 
 <h3> Training </h3>
 
-1. Reads directory of .npy files in <ROOT_DIR>/slices & <ROOT_DIR>/masks.
+1. Reads directory of .npy files in `<ROOT_DIR>/slices` & `<ROOT_DIR>/masks`.
 2. Run `bash split_data.sh`
 3. `python train.py` - defaults to `config.ini`. Specify different config file with `--c`.
 
