@@ -9,8 +9,8 @@ import numpy as np
 import torch
 
 class customWriter(SummaryWriter):
-    def __init__(self, batch_size):
-        super().__init__()
+    def __init__(self, logdir, batch_size):
+        super().__init__(logdir)
         self.metrics = {'train_loss': [], 'val_loss': [], 
                         'BCE': [], 'DSC': []}
         self.epoch = 0
@@ -53,8 +53,8 @@ class customWriter(SummaryWriter):
             pred = self.sigmoid(prediction[idx]).detach().cpu().numpy()[0]
             ax.imshow(pred, alpha=0.5, cmap='magma')
             if targets is not None:
-                tgt = self.sigmoid(targets[idx]).cpu().numpy()[0]
-                ax.imshow(tgt, alpha=0.5, cmap='viridis')
+                tgt = targets[idx].cpu().numpy()[0]
+                ax.imshow(np.where(tgt==0, np.nan, 1), alpha=0.5, cmap='viridis')
             ax.set_title(f'Input @ epoch: {self.epoch} - idx: {idx}')
 
         self.add_figure(title, fig)
