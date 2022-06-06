@@ -10,13 +10,13 @@ from torch.utils.data import Dataset
 class customDataset(Dataset):
     def __init__(self, image_path, transforms, read_masks=False, normalise=True, window=400, level=1074):
         super().__init__()
-        self.images = self.load_data(image_path + 'slices/') #~ Path to directory containing images
+        self.images = self.load_data(os.path.join(image_path, 'slices/')) #~ Path to directory containing images
         self.transforms = transforms #~ Minimum ToTensor()
         self.ids = self.images['id']
         self.normalise = normalise
         self.WL_norm = self.WL_norm(self.images, window=window, level=level)
         if read_masks:
-            self.masks = self.load_data(image_path + 'masks/')
+            self.masks = self.load_data(os.path.join(image_path, 'masks/'))
     
     @staticmethod
     def load_data(path):
@@ -60,9 +60,14 @@ class customDataset(Dataset):
             img = self.WL_norm[index, ..., np.newaxis]
         else:
             img = self.images['slices'][index, ..., np.newaxis]
+            
         #* Convert to three channels if needed
         out_img = self.convert_threeChannel(img)
-        mask = self.masks['slices'][index]
+        if self.masks['slices'].shape != 4:
+            mask = self.masks['slices'][index, ..., np.newaxis]
+        else:
+            mask = self.masks['slices'][index]
+
         if self.transforms:
             augmented = self.transforms(image=out_img, mask=mask)
             sample = {'inputs': augmented['image'], 

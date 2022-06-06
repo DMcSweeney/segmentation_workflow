@@ -33,6 +33,7 @@ class customWriter(SummaryWriter):
         for idx in np.arange(self.batch_size):
             ax = fig.add_subplot(self.batch_size // 2, self.batch_size // 2,
                                  idx+1, label='Inputs')
+            ax.axis('off')
             plt_img = np.moveaxis(img[idx].cpu().numpy(), 0, -1)
             plt_img = self.norm_img(plt_img)
             ax.imshow(plt_img, cmap='gray')
@@ -49,7 +50,7 @@ class customWriter(SummaryWriter):
             plt_img = np.moveaxis(img[idx].cpu().numpy(), 0, -1)
             plt_img = self.norm_img(plt_img)
             ax.imshow(plt_img, cmap='gray')
-            pred = self.sigmoid(prediction[idx]).cpu().numpy()[0]
+            pred = self.sigmoid(prediction[idx]).detach().cpu().numpy()[0]
             ax.imshow(pred, alpha=0.5, cmap='magma')
             if targets is not None:
                 tgt = self.sigmoid(targets[idx]).cpu().numpy()[0]
