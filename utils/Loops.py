@@ -32,7 +32,11 @@ class segmenter():
         self.output_path = output_path
         os.makedirs(output_path, exist_ok=True)
         self.weights = (1, 1) #* X-ent weight vs DSC weight
-        
+    
+    @staticmethod
+    def sigmoid(x):
+        return 1/(1+torch.exp(-x))
+
     def forward(self):
         self.stop = False
         for epoch in range(self.num_epochs+1):
@@ -99,7 +103,7 @@ class segmenter():
                 self.writer.metrics['val_loss'].append(valid_loss.item())
                 #* --- PLOT TENSORBOARD ---#
                 if epoch % writer_step == 0 and batch_idx == 0:
-                    self.writer.plot_segmentation('Predictions', inputs, outputs['out'], targets=None)
+                    self.writer.plot_segmentation('Predictions', inputs, outputs['out'], targets=targets)
 
 
         print('Validation Loss:', np.mean(self.writer.metrics['val_loss']))

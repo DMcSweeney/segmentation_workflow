@@ -48,7 +48,7 @@ class customDataset(Dataset):
     @staticmethod
     def convert_threeChannel(img):
         #~ SHAPE: H x W x C
-        return np.repeat(img, 3, axis=2)
+        return np.repeat(img, 3, axis=-1)
 
     def __len__(self):
         return len(self.images['id'])

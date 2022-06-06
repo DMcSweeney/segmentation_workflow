@@ -8,10 +8,17 @@ import numpy as np
 import os
 import shutil
 import configparser
+from argparse import ArgumentParser
+
+#~ Arg. Parse for config file
+parser = ArgumentParser(description='Inference for testing segmentation model')
+parser.add_argument('--config', '--c', dest='config',
+                    default='config.ini', type=str, help='Path to config.ini file')
+args = parser.parse_args()
 
 #~ ====== Read config file =========
 config = configparser.ConfigParser()
-config.read('config.ini')
+config.read(args.config)
 
 root_dir = config['DIRECTORIES']['InputDirectory']
 mask_path = os.path.join(root_dir, 'masks')

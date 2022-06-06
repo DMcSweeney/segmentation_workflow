@@ -29,7 +29,7 @@ args = parser.parse_args()
 
 #~ ====  Read config === 
 config  = ConfigParser()
-config.read('config.ini')
+config.read(args.config)
 
 root_dir = config['DIRECTORIES']['InputDirectory']
 
@@ -39,6 +39,8 @@ valid_path = os.path.join(root_dir, 'split_data/testing')
 #~ PARAMS
 batch_size = int(config['TRAINING']['BatchSize'])
 num_epochs= int(config['TRAINING']['NumEpochs'])
+inputChannels = int(config['TRAINING']['InputChannels'])
+outputClasses = int(config['TRAINING']['OutputClasses'])
 learning_rate = float(config['TRAINING']['LR'])
 device = f"cuda:{int(config['TRAINING']['GPU'])}"
 print('Using device: ', device)
@@ -47,7 +49,7 @@ weight_path = config['TRAINING']['InitWeights']
 input_size = int(config['TRAINING']['InputSize'])
 
 def load_weights(pt_model):
-    model = models.segmentation.fcn_resnet101(pretrained=False, num_classes=1)
+    model = models.segmentation.fcn_resnet101(pretrained=False, num_classes=outputClasses)
     #* Load weights
     pt_dict = torch.load(pt_model, map_location=device)
     model_dict = model.state_dict()
@@ -103,13 +105,13 @@ def main():
 
     model = load_weights(weight_path)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    writer = customWriter(batch_size)
+    logdir = config['DIRECTORIES']['OutputDirectory']
+    writer = customWriter(logdir, batch_size)
 
     #~ ==== TRAIN =====
     seg = segmenter(model, optimizer, train_loader,
                     valid_loader, writer, num_epochs, 
-                    device=device, output_path=config['DIRECTORIES']['OutputDirectory']
-                    )
+                    device=device, output_path=logdir)
     seg.forward()
 
 
