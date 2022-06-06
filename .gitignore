@@ -12,3 +12,4 @@ config_mres.ini
 *.pt
 *_logs
 ./L3_model/
+*.ipynb

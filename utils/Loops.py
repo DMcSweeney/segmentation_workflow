@@ -87,6 +87,7 @@ class segmenter():
             for batch_idx, data in enumerate(self.val_loader):
                 inputs = data['inputs'].to(self.device, dtype=torch.float32)
                 targets = data['targets'].to(self.device, dtype=torch.float32)
+                
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
                 bce_loss = self.bce(outputs['out'], targets)

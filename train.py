@@ -29,7 +29,7 @@ args = parser.parse_args()
 
 #~ ====  Read config === 
 config  = ConfigParser()
-config.read('config_cbct.ini')
+config.read('config.ini')
 
 root_dir = config['DIRECTORIES']['InputDirectory']
 
