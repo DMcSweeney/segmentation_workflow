@@ -8,18 +8,21 @@ from torch.utils.data import Dataset
 
 
 class customDataset(Dataset):
-    def __init__(self, image_path, transforms, read_masks=False, normalise=True, window=400, level=1074):
+    def __init__(self, image_path, transforms, read_masks=False, normalise=True, window=400, level=1074, worldmatch=False):
         super().__init__()
-        self.images = self.load_data(os.path.join(image_path, 'slices/')) #~ Path to directory containing images
+        # If worldmatch=True, apply WM correction (-1024 HU)
+        self.images = self.load_data(os.path.join(image_path, 'slices/'), worldmatch) #~ Path to directory containing images
         self.transforms = transforms #~ Minimum ToTensor()
         self.ids = self.images['id']
         self.normalise = normalise
         self.WL_norm = self.WL_norm(self.images, window=window, level=level)
-        if read_masks:
+        self.read_masks = read_masks
+        
+        if self.read_masks:
             self.masks = self.load_data(os.path.join(image_path, 'masks/'))
     
     @staticmethod
-    def load_data(path):
+    def load_data(path, worldmatch=False):
         #* Expects contents of directory to be .npy (ID.npy)
         data_dict = {'slices': [], 'id': []}
         for file in os.listdir(path):
@@ -27,6 +30,9 @@ class customDataset(Dataset):
                 name = file.split('.')[0]
                 data_dict['id'].append(name)
                 slice_ = np.load(path + file)
+                slice_ = np.squeeze(slice_)
+                if worldmatch:
+                    slice_ += 1024
                 data_dict['slices'].append(slice_)
         data_dict['slices'] = np.array(data_dict['slices'])
         return data_dict
@@ -60,20 +66,30 @@ class customDataset(Dataset):
             img = self.WL_norm[index, ..., np.newaxis]
         else:
             img = self.images['slices'][index, ..., np.newaxis]
-            
+
         #* Convert to three channels if needed
         out_img = self.convert_threeChannel(img)
-        if self.masks['slices'].shape != 4:
-            mask = self.masks['slices'][index, ..., np.newaxis]
-        else:
-            mask = self.masks['slices'][index]
+        
+        if self.read_masks:
+            if len(self.masks['slices'].shape) != 4:
+                mask = self.masks['slices'][index, ..., np.newaxis]
+
+            else:
+                mask = self.masks['slices'][index]
+                mask = np.argmax(mask, axis=-1)
 
         if self.transforms:
-            augmented = self.transforms(image=out_img, mask=mask)
-            sample = {'inputs': augmented['image'], 
-                    'targets': augmented['mask'],
-                    'id': pid}
-            return sample
+            if self.read_masks:
+                augmented = self.transforms(image=out_img, mask=mask)
+                sample = {'inputs': augmented['image'], 
+                        'targets': augmented['mask'],
+                        'id': pid}
+                return sample
+            else:
+                augmented = self.transforms(image=out_img)
+                sample = {'inputs': augmented['image'],
+                        'id': pid}
+                return sample
         else:
             print('Need some transforms - minimum ToTensor().')
             raise

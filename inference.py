@@ -1,6 +1,7 @@
 """
 Check model inference.
 """
+from typing import OrderedDict
 from utils.Dataset import customDataset
 from utils.Loops import segmenter
 
@@ -12,6 +13,7 @@ from albumentations.pytorch import ToTensorV2
 from torch.utils.data import DataLoader
 
 from torchvision.models.segmentation import fcn_resnet101
+from utils.Models import Titan_base
 
 from configparser import ConfigParser
 from argparse import ArgumentParser
@@ -44,12 +46,19 @@ def inference(model, test_loader):
             device, dtype=torch.float32), data['id']
         id_list.append(id_)
         outputs = model(inputs)
+
+        inputs = inputs.cpu().numpy()
+        if isinstance(outputs, OrderedDict):
+            outputs = outputs['out']
+        outputs = outputs.cpu().detach().numpy()
+
+        
         if idx == 0:
             input_slices = inputs
-            predictions = outputs['out']
+            predictions = outputs
         else:
-            input_slices = torch.cat((input_slices, inputs), dim=0)
-            predictions = torch.cat((predictions, outputs['out']), dim=0)
+            input_slices = np.concatenate((input_slices, inputs), axis=0)
+            predictions = np.concatenate((predictions, outputs), axis=0)
     return input_slices, predictions, id_list
 
 
@@ -60,21 +69,28 @@ def main():
 
     #* Dataset
     test_dataset = customDataset(
-        test_path, test_transforms, read_masks=True,
+        test_path, test_transforms, read_masks=False,
         normalise=config['TRAINING'].getboolean('Normalise'),
-        window=config['TRAINING'].getint('Window'), level=config['TRAINING'].getint('Level'))
+        window=config['TRAINING'].getint('Window'), level=config['TRAINING'].getint('Level'),
+        worldmatch=False)
     print('Test Size', test_dataset.__len__())
     test_generator = DataLoader(test_dataset, batch_size)
 
     #* Load model
-    model = fcn_resnet101(pretrained=False, num_classes=1).cuda()
-    model.load_state_dict(torch.load(weights_path, map_location=device))
+    if config['TRAINING']['InitWeights'] != "None":
+        model = fcn_resnet101(pretrained=False, num_classes=1).cuda()
+        model.load_state_dict(torch.load(weights_path, map_location=device))
+    else:
+        model=Titan_base(num_classes=4)
+        model.load_state_dict(torch.load(weights_path, map_location=device))
+        model.to(device)
+
     model.eval()
 
     #~ ==== INFERENCE =====
     slices, preds, ids = inference(model, test_generator)
     np.savez(os.path.join(config['DIRECTORIES']['OutputDirectory'], 'predictions.npz'),
-     slices=slices.cpu(), masks=preds.detach().cpu(), id=ids)
+     slices=slices, masks=preds, id=ids)
 
 if __name__=='__main__':
     main()

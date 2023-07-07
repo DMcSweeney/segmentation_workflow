@@ -17,6 +17,7 @@ from argparse import ArgumentParser
 from utils.Dataset import customDataset
 from utils.Loops import segmenter
 from utils.Writer import customWriter
+from utils.Models import Titan_base
 import cv2
 import os
 
@@ -48,9 +49,10 @@ torch.cuda.set_device(device)
 weight_path = config['TRAINING']['InitWeights']
 input_size = int(config['TRAINING']['InputSize'])
 
-def load_weights(pt_model):
-    model = models.segmentation.fcn_resnet101(pretrained=False, num_classes=outputClasses)
+def load_weights(model, pt_model):
+    ##
     #* Load weights
+    
     pt_dict = torch.load(pt_model, map_location=device)
     model_dict = model.state_dict()
 
@@ -77,7 +79,7 @@ def main():
     train_transforms = A.Compose([
         A.HorizontalFlip(p=0.5),
         A.Rotate(p=0.5, limit=20, border_mode=cv2.BORDER_CONSTANT, value=0),
-        A.GridDistortion(p=0.5, num_steps=3, distort_limit=0.3, border_mode=4, interpolation=1),
+        #A.GridDistortion(p=0.5, num_steps=3, distort_limit=0.3, border_mode=4, interpolation=1),
         A.RandomScale(),
         A.Resize(input_size, input_size),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(
@@ -91,26 +93,38 @@ def main():
         ToTensorV2(transpose_mask=True)])
 
     #~ init. Datasets
+    print(train_path)
     train_dataset = customDataset(train_path, train_transforms, read_masks=True, 
             normalise=config['TRAINING'].getboolean('Normalise'),
-            window=config['TRAINING'].getint('Window'), level=config['TRAINING'].getint('Level'))
+            window=config['TRAINING'].getint('Window'),
+            level=config['TRAINING'].getint('Level'))
 
     valid_dataset = customDataset(
         valid_path, valid_transforms, read_masks=True, 
         normalise = config['TRAINING'].getboolean('Normalise'),
-        window=config['TRAINING'].getint('Window'), level=config['TRAINING'].getint('Level'))
-
+        window=config['TRAINING'].getint('Window'),
+        level=config['TRAINING'].getint('Level'))
+    print('TRAINING/TESTING', train_dataset.__len__(), valid_dataset.__len__())
     train_loader = DataLoader(train_dataset, batch_size)
     valid_loader = DataLoader(valid_dataset, batch_size)
-
-    model = load_weights(weight_path)
+    #*===== CHANGE MODEL =========
+    
+    if weight_path != "None":
+        #model = models.segmentation.fcn_resnet101(pretrained=False, num_classes=outputClasses)
+        model = Titan_base(num_classes=outputClasses)
+        model = load_weights(model, weight_path)
+        model.to(device)
+    else:
+        model=Titan_base(num_classes=outputClasses)
+        model.to(device)
+    #*============================
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     logdir = config['DIRECTORIES']['OutputDirectory']
     writer = customWriter(logdir, batch_size)
 
     #~ ==== TRAIN =====
     seg = segmenter(model, optimizer, train_loader,
-                    valid_loader, writer, num_epochs, 
+                    valid_loader, writer, num_epochs, num_outputs=outputClasses,
                     device=device, output_path=logdir)
     seg.forward()
 

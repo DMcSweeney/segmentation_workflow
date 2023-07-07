@@ -7,10 +7,11 @@ from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import os
 
 class customWriter(SummaryWriter):
     def __init__(self, logdir, batch_size):
-        super().__init__(logdir)
+        super().__init__(os.path.join(logdir, 'runs'))
         self.metrics = {'train_loss': [], 'val_loss': [], 
                         'BCE': [], 'DSC': []}
         self.epoch = 0
@@ -50,12 +51,18 @@ class customWriter(SummaryWriter):
             plt_img = np.moveaxis(img[idx].cpu().numpy(), 0, -1)
             plt_img = self.norm_img(plt_img)
             ax.imshow(plt_img, cmap='gray')
-            pred = self.sigmoid(prediction[idx]).detach().cpu().numpy()[0]
-            ax.imshow(pred, alpha=0.5, cmap='magma')
+            pred = prediction[idx]
+            if pred.shape[0] == 1:
+                pred = np.round(self.sigmoid(pred).detach().cpu().numpy())
+            else:
+                pred = torch.argmax(pred, dim=0).detach().cpu().numpy()
+            pred = np.squeeze(pred)
+            ax.imshow(pred, alpha=0.5, cmap='viridis')
+            #ax.imshow(np.where(pred==0, np.nan, pred), alpha=0.5, cmap='viridis')
             if targets is not None:
-                tgt = targets[idx].cpu().numpy()[0]
-                ax.imshow(np.where(tgt==0, np.nan, 1), alpha=0.5, cmap='viridis')
+                tgt = np.squeeze(targets[idx].cpu().numpy())
+                #ax.imshow(np.where(tgt==0, np.nan, tgt), alpha=0.5, cmap='viridis')
             ax.set_title(f'Input @ epoch: {self.epoch} - idx: {idx}')
 
-        self.add_figure(title, fig)
+        self.add_figure(title, fig, global_step=self.epoch)
         self.flush()

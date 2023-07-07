@@ -28,6 +28,8 @@ config = ConfigParser()
 config.read(args.config)
 
 onnx_config = config['ONNX']
+numOutputs = int(config['TRAINING']['OutputClasses'])
+
 
 def main():
     #~ Load models
@@ -41,11 +43,10 @@ def main():
         model.load_state_dict(torch.load(onnx_config['Path2weights'], map_location=torch.device(device)))
     
     elif onnx_config['ModelSource'] == 'custom':
-        model = ox.get_custom_model(args.custom)
+        model = ox.get_custom_model(onnx_config['Architecture'], num_classes=numOutputs)
         if model is None:
             raise NotImplementedError('Architecture not implemented yet.')
-        model.to(device)
-        model.load_best(args.weights, logger=None)
+        model.load_state_dict(torch.load(onnx_config['Path2weights'], map_location=torch.device(device)))
     
     else:
         raise ValueError("Choose architecture from [torchvision/segmentation_models_pytorch/custom]")
@@ -53,7 +54,7 @@ def main():
     #* Template input tensor
     dummy_input = torch.randn(1, int(config['TRAINING']['InputChannels']), 
         int(config['TRAINING']['InputSize']), int(config['TRAINING']['InputSize']), requires_grad=True, device=device)
-
+    print(dummy_input.shape)
     #* Export with dynamic axes (batch, height, width)
     dynamic_axes = {
         'input': {0: 'batch_size', 2: 'width', 3: 'height'},
