@@ -104,9 +104,8 @@ class segmenter():
             print('VALIDATION')
             for batch_idx, data in enumerate(self.val_loader):
                 inputs = data['inputs'].to(self.device, dtype=torch.float32)
-                targets = data['targets'].to(self.device, dtype=self.target_dtype)
-
-                
+                targets = data['targets'].to(self.device, dtype=torch.float32)
+                self.optimizer.zero_grad()
                 outputs = self.model(inputs)
                 bce_loss = self.bce(outputs, targets)
                 dice_loss = self.dsc(outputs, targets)
